@@ -1,0 +1,19 @@
+[toolchain]
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+meteora_cpi = "2yU9iK3ZfPsXNyFzrmKkRZHbHok1JoBCDJBpNDLpdNzk"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Devnet"
+wallet = "/Users/tuanhoang/.config/solana/id.json"
+
+[scripts]
+gen = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/fixtures/**/*.ts"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/meteora-cpi.ts"
