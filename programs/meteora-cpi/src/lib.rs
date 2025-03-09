@@ -7,7 +7,7 @@ use anchor_lang::system_program::Transfer as NativeSolTransfer;
 use dynamic_amm::instructions::CustomizableParams;
 pub const POOL_SIZE: usize = 8 + 944;
 
-declare_id!("2yU9iK3ZfPsXNyFzrmKkRZHbHok1JoBCDJBpNDLpdNzk");
+declare_id!("DA3yHByryquEJo2g3mFgo2UMJoewwsddadb3E5tNEatr");
 
 #[program]
 pub mod meteora_cpi {
@@ -140,18 +140,18 @@ pub struct CreateLP<'info> {
     pub lp_mint: UncheckedAccount<'info>,
 
     /// CHECK: Token A mint of the pool. Eg: USDT
-    pub token_a_mint: UncheckedAccount<'info>,
+    pub token_a_mint: Box<Account<'info, Mint>>,
 
     /// CHECK: Token B mint of the pool. Eg: USDC
-    pub token_b_mint: UncheckedAccount<'info>,
+    pub token_b_mint: Box<Account<'info, Mint>>,
 
     /// CHECK: Vault account for token A. Token A of the pool will be deposit / withdraw from this vault account.
     #[account(mut)]
-    pub a_vault: UncheckedAccount<'info>,
+    pub a_vault: AccountInfo<'info>,
 
     #[account(mut)]
     /// CHECK: Vault account for token B. Token B of the pool will be deposit / withdraw from this vault account.
-    pub b_vault: UncheckedAccount<'info>,
+    pub b_vault: AccountInfo<'info>,
 
     #[account(mut)]
     /// CHECK: Token vault account of vault A
@@ -163,19 +163,19 @@ pub struct CreateLP<'info> {
 
     #[account(mut)]
     /// CHECK: LP token mint of vault A
-    pub a_vault_lp_mint: UncheckedAccount<'info>,
+    pub a_vault_lp_mint: Box<Account<'info, Mint>>,
 
     #[account(mut)]
     /// CHECK: LP token mint of vault B
-    pub b_vault_lp_mint: UncheckedAccount<'info>,
+    pub b_vault_lp_mint: Box<Account<'info, Mint>>,
 
     /// CHECK: LP token account of vault A. Used to receive/burn the vault LP upon deposit/withdraw from the vault.
     #[account(mut)]
-    pub a_vault_lp: Box<Account<'info, TokenAccount>>,
+    pub a_vault_lp: UncheckedAccount<'info>,
 
     /// CHECK: LP token account of vault B. Used to receive/burn vault LP upon deposit/withdraw from the vault.
     #[account(mut)]
-    pub b_vault_lp: Box<Account<'info, TokenAccount>>,
+    pub b_vault_lp: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Payer token account for pool token A mint. Used to bootstrap the pool with initial liquidity.
@@ -187,15 +187,15 @@ pub struct CreateLP<'info> {
 
     /// CHECK: Creator pool LP token account. Used to receive LP during first deposit (initialize pool). Creator is a PDA.
     #[account(mut)]
-    pub creator_pool_lp: Box<Account<'info, TokenAccount>>,
+    pub creator_pool_lp: UncheckedAccount<'info>,
 
     #[account(mut)]
     /// CHECK: Protocol fee token account for token A. Used to receive trading fee.
-    pub protocol_token_a_fee: Box<Account<'info, TokenAccount>>,
+    pub protocol_token_a_fee: UncheckedAccount<'info>,
 
     /// CHECK: Protocol fee token account for token B. Used to receive trading fee.
     #[account(mut)]
-    pub protocol_token_b_fee: Box<Account<'info, TokenAccount>>,
+    pub protocol_token_b_fee: UncheckedAccount<'info>,
 
     /// CHECK: Payer account. This account will be the creator of the pool, and the payer for PDA during initialize pool.
     #[account(mut)]

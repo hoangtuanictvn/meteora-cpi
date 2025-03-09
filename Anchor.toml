@@ -5,7 +5,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-meteora_cpi = "2yU9iK3ZfPsXNyFzrmKkRZHbHok1JoBCDJBpNDLpdNzk"
+meteora_cpi = "DA3yHByryquEJo2g3mFgo2UMJoewwsddadb3E5tNEatr"
 
 [registry]
 url = "https://api.apr.dev"

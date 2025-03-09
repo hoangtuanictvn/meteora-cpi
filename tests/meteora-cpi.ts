@@ -5,7 +5,7 @@ import {
   PublicKey, sendAndConfirmTransaction, SystemProgram, Transaction
 } from "@solana/web3.js";
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction,
   getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
 
@@ -16,7 +16,9 @@ import {BN, Idl, Program} from '@coral-xyz/anchor';
 
 import {METAPLEX_PROGRAM, SEEDS} from "@meteora-ag/dynamic-amm-sdk/dist/cjs/src/amm/constants";
 import { SEEDS as VSEEDS} from "@meteora-ag/vault-sdk/dist/cjs/src/vault/constants";
+import {VaultIDL} from "./utils/vault/idl";
 import VaultImpl from "@meteora-ag/vault-sdk";
+
 function getFirstKey(key1: PublicKey, key2: PublicKey): PublicKey {
   if (key1.toBuffer().compare(key2.toBuffer()) > 0) {
     return key1;
@@ -139,6 +141,10 @@ describe('Meteora CPI Tests', () => {
     connection: anchor.getProvider().connection,
   });
 
+  const vaultProgram = new Program(VaultIDL as Idl, new PublicKey(vaultProgramId),{
+    connection: anchor.getProvider().connection,
+  });
+
   const payer = Keypair.fromSecretKey(new Uint8Array(feePayerKP));
   const tokenAMint = Keypair.fromSecretKey(new Uint8Array(tokenAKP));
   const tokenBMint = Keypair.fromSecretKey(new Uint8Array(tokenBKP));
@@ -201,6 +207,15 @@ describe('Meteora CPI Tests', () => {
       true
     );
 
+    // if(await provider.connection.getAccountInfo(creatorPoolLp) == null) {
+    //   const tx = new Transaction();
+    //   tx.add(createAssociatedTokenAccountInstruction(payer.publicKey, creatorPoolLp, creatorAuthorityPDA, lpMint))
+    //   const s = await sendAndConfirmTransaction(provider.connection, tx, [payer], {
+    //     skipPreflight: true
+    //   })
+    //   console.log("create creator pool lp", s);
+    // }
+
     [
       { vaultPda: aVault, tokenVaultPda: aTokenVault, lpMintPda: aLpMintPda },
       { vaultPda: bVault, tokenVaultPda: bTokenVault, lpMintPda: bLpMintPda },
@@ -220,64 +235,76 @@ describe('Meteora CPI Tests', () => {
   });
 
   it('Creates a liquidity pool successfully', async () => {
-    const vaultImpls = await VaultImpl.createMultiple(provider.connection, [tokenAMint.publicKey, tokenBMint.publicKey], {
-      programId: vaultProgramId.toBase58()
-    });
-    for (let i = 0; i < vaultImpls.length; i++) {
-      // const vtx = await vaultImpls[i].deposit(payer.publicKey, new BN(10*10^6))
-      // const vtxs = await sendAndConfirmTransaction(provider.connection, vtx, [payer])
-      // console.log(vtxs)
+    if(await provider.connection.getAccountInfo(aVault) == null) {
+      const createVaultInx = await VaultImpl.createPermissionlessVaultInstruction(provider.connection, payer.publicKey, tokenAMint.publicKey, {
+        programId: vaultProgramId.toBase58()
+      })
+      const vtx = new Transaction();
+      vtx.add(createVaultInx)
+      const vtxs = await sendAndConfirmTransaction(provider.connection, vtx, [payer])
+      console.log("create a vault", vtxs)
     }
-    // const params = {
-    //   tradeFeeNumerator: new BN(10_000),
-    //   activationPoint: null,
-    //   hasAlphaVault: false,
-    //   activationType: 1,
-    //   padding: Buffer.alloc(90, 0),
-    // };
-    //
-    // const ix = await program.methods
-    //   .createLp(
-    //     new BN(100), new BN(100), params
-    //   )
-    //   .accountsStrict({
-    //     authority: creatorAuthorityPDA,
-    //     creatorTokenA: creatorTokenAAccount,
-    //     creatorTokenB: creatorTokenBAccount,
-    //     pool: pool,
-    //     lpMint: lpMint,
-    //     tokenAMint: tokenAMint.publicKey,
-    //     tokenBMint: tokenBMint.publicKey,
-    //     aVault: aVault,
-    //     bVault: bVault,
-    //     aTokenVault: aTokenVault,
-    //     bTokenVault: bTokenVault,
-    //     aVaultLpMint: aLpMintPda,
-    //     bVaultLpMint: bLpMintPda,
-    //     aVaultLp: aVaultLp,
-    //     bVaultLp: bVaultLp,
-    //     payerTokenA: payerTokenA,
-    //     payerTokenB: payerTokenB,
-    //     creatorPoolLp: creatorPoolLp,
-    //     protocolTokenAFee: protocolTokenAFee,
-    //     protocolTokenBFee: protocolTokenBFee,
-    //     payer: payer.publicKey,
-    //     rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-    //     mintMetadata: mintMetadata,
-    //     metadataProgram: METAPLEX_PROGRAM,
-    //     vaultProgram: new PublicKey("24Uqj9JCLxUeoC3hGfh5W3s9FM9uCHDS2SG3LYwBpyTi"),
-    //     tokenProgram: TOKEN_PROGRAM_ID,
-    //     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-    //     systemProgram: SystemProgram.programId,
-    //     dynamicAmmProgram: dynamicAmmProgramId
-    //   })
-    //   .signers([payer])
-    //   .instruction();
-    //
-    // const tx = new Transaction();
-    // tx.add(ix)
-    // const txs = await sendAndConfirmTransaction(provider.connection, tx, [payer])
-    //
-    // console.log("Liquidity pool created successfully!", txs);
+
+    if(await provider.connection.getAccountInfo(bVault) == null) {
+      const createVaultInx = await VaultImpl.createPermissionlessVaultInstruction(provider.connection, payer.publicKey, tokenBMint.publicKey, {
+        programId: vaultProgramId.toBase58()
+      })
+      const vtx = new Transaction();
+      vtx.add(createVaultInx)
+      const vtxs = await sendAndConfirmTransaction(provider.connection, vtx, [payer])
+      console.log("create B vault", vtxs)
+    }
+
+    const params = {
+      tradeFeeNumerator: new BN(10_000),
+      activationPoint: null,
+      hasAlphaVault: false,
+      activationType: 1,
+      padding: Buffer.alloc(90, 0),
+    };
+
+    const ix = await program.methods
+      .createLp(
+        new BN(100), new BN(100), params
+      )
+      .accountsStrict({
+        authority: creatorAuthorityPDA,
+        creatorTokenA: creatorTokenAAccount,
+        creatorTokenB: creatorTokenBAccount,
+        pool: pool,
+        lpMint: lpMint,
+        tokenAMint: tokenAMint.publicKey,
+        tokenBMint: tokenBMint.publicKey,
+        aVault: aVault,
+        bVault: bVault,
+        aTokenVault: aTokenVault,
+        bTokenVault: bTokenVault,
+        aVaultLpMint: aLpMintPda,
+        bVaultLpMint: bLpMintPda,
+        aVaultLp: aVaultLp,
+        bVaultLp: bVaultLp,
+        payerTokenA: payerTokenA,
+        payerTokenB: payerTokenB,
+        creatorPoolLp: creatorPoolLp,
+        protocolTokenAFee: protocolTokenAFee,
+        protocolTokenBFee: protocolTokenBFee,
+        payer: payer.publicKey,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        mintMetadata: mintMetadata,
+        metadataProgram: METAPLEX_PROGRAM,
+        vaultProgram: new PublicKey("24Uqj9JCLxUeoC3hGfh5W3s9FM9uCHDS2SG3LYwBpyTi"),
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        dynamicAmmProgram: dynamicAmmProgramId
+      })
+      .signers([payer])
+      .instruction();
+
+    const tx = new Transaction();
+    tx.add(ix)
+    const txs = await sendAndConfirmTransaction(provider.connection, tx, [payer])
+
+    console.log("Liquidity pool created successfully!", txs);
   });
 });
