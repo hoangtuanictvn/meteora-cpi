@@ -1,19 +1,20 @@
 [toolchain]
 
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
 [programs.localnet]
-meteora_cpi = "DA3yHByryquEJo2g3mFgo2UMJoewwsddadb3E5tNEatr"
+meteora_cpi = "2tixmznywHMmRBQehqhuHpg4x2nAzxyCCNPymc5e1id8"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Devnet"
-wallet = "/Users/tuanhoang/.config/solana/id.json"
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
+create-lp = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/create-pool.ts"
 gen = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/fixtures/**/*.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/meteora-cpi.ts"

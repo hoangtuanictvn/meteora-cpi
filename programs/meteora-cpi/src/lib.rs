@@ -1,14 +1,33 @@
+mod external_programs;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{Mint, Token, TokenAccount, Transfer as TokenTransfer},
 };
 use anchor_lang::system_program::Transfer as NativeSolTransfer;
-use dynamic_amm::instructions::CustomizableParams;
+use switchboard_on_demand::on_demand::accounts::pull_feed::PullFeedAccountData;
+use rust_decimal::Decimal;
 pub const POOL_SIZE: usize = 8 + 944;
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct DynamicAmmCustomizableParams {
+    /// Trading fee.
+    pub trade_fee_numerator: u32,
+    /// The pool start trading.
+    pub activation_point: Option<u64>,
+    /// Whether the pool support alpha vault
+    pub has_alpha_vault: bool,
+    /// Activation type
+    pub activation_type: u8,
+    /// Padding
+    pub padding: [u8; 90],
+}
 
-declare_id!("DA3yHByryquEJo2g3mFgo2UMJoewwsddadb3E5tNEatr");
+use crate::external_programs::{
+    dynamic_amm
+};
 
+declare_id!("2tixmznywHMmRBQehqhuHpg4x2nAzxyCCNPymc5e1id8");
 #[program]
 pub mod meteora_cpi {
     use super::*;
@@ -19,11 +38,24 @@ pub mod meteora_cpi {
         Ok(())
     }
 
+    pub fn liquidate(
+        ctx: Context<Liquidation>,
+    ) -> Result<()> {
+        let feed_account = ctx.accounts.feed.data.borrow();
+        let feed = PullFeedAccountData::parse(feed_account).unwrap();
+        let max_stale_slots = 100;
+        let min_samples = 1;
+        let price: Decimal = feed.get_value(&Clock::get()?, max_stale_slots, min_samples, true).unwrap();
+
+        msg!("Oracle Price: {}", price);
+        Ok(())
+    }
+
     pub fn create_lp(
        ctx: Context<CreateLP>,
        token_a_amount: u64,
        token_b_amount: u64,
-       params: CustomizableParams
+       params: DynamicAmmCustomizableParams
     ) -> Result<()> {
         fund_creator_authority(
             token_a_amount,
@@ -86,7 +118,13 @@ pub mod meteora_cpi {
             cpi_context,
             token_a_amount,
             token_b_amount,
-            params,
+            dynamic_amm::types::CustomizableParams{
+                trade_fee_numerator: params.trade_fee_numerator,
+                activation_point: params.activation_point,
+                has_alpha_vault: params.has_alpha_vault,
+                activation_type: params.activation_type,
+                padding: params.padding,
+            },
         )
     }
 }
@@ -105,29 +143,32 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct CreateLP<'info> {
+pub struct Liquidation<'info> {
+    /// CHECK: feed account validate
+    pub feed: AccountInfo<'info>,
+}
 
+#[derive(Accounts)]
+pub struct CreateLP<'info> {
     /// CHECK: Creator authority
     #[account(
         mut,
-        seeds = [b"vault"],
+        seeds = [b"creator"],
         bump
     )]
     pub authority: UncheckedAccount<'info>,
 
     #[account(
-        init_if_needed,
+        mut,
         associated_token::mint = token_a_mint,
         associated_token::authority = authority,
-        payer = payer
     )]
     pub creator_token_a: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        init_if_needed,
+        mut,
         associated_token::mint = token_b_mint,
         associated_token::authority = authority,
-        payer = payer
     )]
     pub creator_token_b: Box<Account<'info, TokenAccount>>,
 
@@ -296,7 +337,7 @@ pub fn fund_creator_authority<'b, 'info>(
     // LP mint Metadata
     lamports += Rent::get()?.minimum_balance(679);
     // Metaplex fee ...
-    lamports += 10_000_000;
+    lamports += 40_000_000;
 
     msg!("Required lamports: {}", lamports);
 
@@ -308,9 +349,7 @@ pub fn fund_creator_authority<'b, 'info>(
                 to: creator_authority.to_account_info(),
             },
         ),
-        // Weird bug in bpf, more lamport causes failure. The calculated lamports above should be the correct one
-        // lamports,
-        34290400,
+        lamports,
     )?;
 
     Ok(())
